@@ -16,6 +16,9 @@ def main_menu_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🆘 Support", callback_data="menu_support"),
         InlineKeyboardButton(text="📊 History", callback_data="menu_history")
     )
+    builder.row(
+        InlineKeyboardButton(text="🎟️ Redeem Code", callback_data="menu_redeem")
+    )
     if is_admin:
         builder.row(InlineKeyboardButton(text="🔐 Admin Panel", callback_data="admin_panel"))
     return builder.as_markup()
@@ -35,7 +38,7 @@ def games_menu_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎯 Darts", callback_data="game_darts"),
         InlineKeyboardButton(text="🚀 Limbo", callback_data="game_limbo")
     )
-    builder.row(InlineKeyboardButton(text="🪙 Coin Flip", callback_data="game_coinflip"))
+    builder.row(InlineKeyboardButton(text="🪙 Coin Flip /cf", callback_data="game_coinflip"))
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
     return builder.as_markup()
 
@@ -98,7 +101,10 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📢 Broadcast", callback_data="admin_broadcast"),
         InlineKeyboardButton(text="📊 Stats", callback_data="admin_stats")
     )
-    builder.row(InlineKeyboardButton(text="⚙️ Settings", callback_data="admin_settings"))
+    builder.row(
+        InlineKeyboardButton(text="🎟️ Redeem Codes", callback_data="admin_redeems"),
+        InlineKeyboardButton(text="⚙️ Settings", callback_data="admin_settings")
+    )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
     return builder.as_markup()
 
@@ -164,5 +170,12 @@ def bonus_claim_kb(can_weekly: bool, can_monthly: bool) -> InlineKeyboardMarkup:
         builder.row(InlineKeyboardButton(text="🗓️ Claim Weekly Bonus", callback_data="bonus_claim_weekly"))
     if can_monthly:
         builder.row(InlineKeyboardButton(text="📅 Claim Monthly Bonus", callback_data="bonus_claim_monthly"))
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
+    return builder.as_markup()
+
+
+def redeem_menu_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🎟️ Enter Code", callback_data="redeem_enter"))
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
     return builder.as_markup()
