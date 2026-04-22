@@ -62,6 +62,7 @@ class Database:
                     method TEXT NOT NULL,
                     amount REAL NOT NULL,
                     txn_id TEXT DEFAULT '',
+                    screenshot_id TEXT DEFAULT '',
                     status TEXT DEFAULT 'pending',
                     date TEXT NOT NULL
                 )
@@ -88,7 +89,10 @@ class Database:
                 ("upi_id", "notset@upi"),
                 ("upi_qr", ""),
                 ("star_payment_id", ""),
-                ("bot_username_tag", ""),   # admin sets this e.g. @CasinoBot
+                ("bot_username_tag", ""),
+                ("deposit_tax", "5"),        # % tax on deposits
+                ("withdrawal_tax", "0"),     # % tax on withdrawals
+                ("referral_percent", "1"),   # % of bet amount
             ]
             for key, value in defaults:
                 await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
@@ -164,7 +168,9 @@ class Database:
     async def get_transactions(self, user_id: int, limit: int = 10) -> List[Dict]:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            async with db.execute("SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC LIMIT ?", (user_id, limit)) as cur:
+            async with db.execute(
+                "SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC LIMIT ?", (user_id, limit)
+            ) as cur:
                 return [dict(r) for r in await cur.fetchall()]
 
     async def create_withdrawal(self, user_id: int, amount: float, upi_id: str) -> int:
@@ -195,15 +201,23 @@ class Database:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
-    async def create_deposit(self, user_id: int, method: str, amount: float, txn_id: str = "") -> int:
+    async def create_deposit(self, user_id: int, method: str, amount: float, txn_id: str = "", screenshot_id: str = "") -> int:
         async with self._lock:
             async with aiosqlite.connect(self.db_path) as db:
                 cur = await db.execute(
-                    "INSERT INTO deposits (user_id, method, amount, txn_id, status, date) VALUES (?, ?, ?, ?, 'pending', ?)",
-                    (user_id, method, amount, txn_id, datetime.now().isoformat())
+                    "INSERT INTO deposits (user_id, method, amount, txn_id, screenshot_id, status, date) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+                    (user_id, method, amount, txn_id, screenshot_id, datetime.now().isoformat())
                 )
                 await db.commit()
                 return cur.lastrowid
+
+    async def update_deposit_screenshot(self, did: int, screenshot_id: str, txn_id: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE deposits SET screenshot_id=?, txn_id=? WHERE id=?",
+                (screenshot_id, txn_id, did)
+            )
+            await db.commit()
 
     async def get_pending_deposits(self) -> List[Dict]:
         async with aiosqlite.connect(self.db_path) as db:
@@ -245,7 +259,10 @@ class Database:
         try:
             async with self._lock:
                 async with aiosqlite.connect(self.db_path) as db:
-                    await db.execute("INSERT OR REPLACE INTO balance_locks (user_id, locked_amount) VALUES (?, ?)", (user_id, amount))
+                    await db.execute(
+                        "INSERT OR REPLACE INTO balance_locks (user_id, locked_amount) VALUES (?, ?)",
+                        (user_id, amount)
+                    )
                     await db.commit()
             return True
         except Exception as e:
@@ -284,7 +301,10 @@ class Database:
 
     async def set_warn(self, user_id: int, warned: int, warn_time: Optional[str]):
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("UPDATE users SET bonus_warned=?, warn_time=? WHERE user_id=?", (warned, warn_time, user_id))
+            await db.execute(
+                "UPDATE users SET bonus_warned=?, warn_time=? WHERE user_id=?",
+                (warned, warn_time, user_id)
+            )
             await db.commit()
 
     async def reset_bonus_progress(self, user_id: int):
