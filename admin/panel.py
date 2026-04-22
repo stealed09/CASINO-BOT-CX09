@@ -98,16 +98,19 @@ async def show_admin_stats(callback: CallbackQuery):
     wd_tax = await db.get_setting("withdrawal_tax")
     ref_pct = await db.get_setting("referral_percent")
 
-    await callback.message.edit_text(
+    text = (
         f"📊 *BOT STATS*\n{SEP}\n"
         f"👥 Users: *{len(users)}*\n"
         f"💰 Total Balance: *₹{total_bal:,.2f}*\n"
         f"🎰 Total Wagered: *₹{total_wag:,.2f}*\n"
         f"📥 Deposit Tax: *{dep_tax}%*\n"
         f"📤 Withdraw Tax: *{wd_tax}%*\n"
-        f"🤝 Referral: *{ref_pct}%*\n{SEP}",
-        parse_mode="Markdown", reply_markup=back_kb("admin_panel")
+        f"🤝 Referral: *{ref_pct}%*\n{SEP}"
     )
+    try:
+        await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=back_kb("admin_panel"))
+    except:
+        await callback.message.answer(text, parse_mode="Markdown", reply_markup=back_kb("admin_panel"))
     await callback.answer()
 
 
@@ -123,7 +126,7 @@ async def show_admin_settings(callback: CallbackQuery):
     ref_pct = await db.get_setting("referral_percent")
     tag = await db.get_setting("bot_username_tag")
 
-    await callback.message.edit_text(
+    text = (
         f"⚙️ *SETTINGS*\n{SEP}\n"
         f"💸 Min Withdrawal: ₹{min_wd}\n"
         f"🔄 Withdrawals: {'🟢 ON' if wd_en == '1' else '🔴 OFF'}\n"
@@ -134,10 +137,14 @@ async def show_admin_settings(callback: CallbackQuery):
         f"🏦 UPI: `{upi}`\n"
         f"📥 Deposit Tax: *{dep_tax}%*\n"
         f"📤 Withdraw Tax: *{wd_tax}%*\n"
-        f"🤝 Referral %: *{ref_pct}%*\n{SEP}",
-        parse_mode="Markdown",
-        reply_markup=admin_settings_kb()
+        f"🤝 Referral %: *{ref_pct}%*\n{SEP}"
     )
+    try:
+        await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=admin_settings_kb())
+    except Exception as e:
+        # Ignore "message is not modified" error - content is same, just answer
+        if "message is not modified" not in str(e):
+            await callback.message.answer(text, parse_mode="Markdown", reply_markup=admin_settings_kb())
     await callback.answer()
 
 
@@ -147,6 +154,8 @@ async def cmd_add_balance(message: Message, bot: Bot):
         await message.answer("Usage: `/addbalance user_id amount`", parse_mode="Markdown"); return
     try:
         target, amount = int(parts[1]), float(parts[2])
+        if target in ADMIN_IDS:
+            await message.answer(error_text("Cannot modify admin balance with this command."), parse_mode="Markdown"); return
         user = await db.get_user(target)
         if not user:
             await message.answer(error_text("User not found."), parse_mode="Markdown"); return
@@ -166,6 +175,8 @@ async def cmd_remove_balance(message: Message, bot: Bot):
         await message.answer("Usage: `/removebalance user_id amount`", parse_mode="Markdown"); return
     try:
         target, amount = int(parts[1]), float(parts[2])
+        if target in ADMIN_IDS:
+            await message.answer(error_text("Cannot modify admin balance with this command."), parse_mode="Markdown"); return
         user = await db.get_user(target)
         if not user or user["balance"] < amount:
             await message.answer(error_text("User not found or insufficient balance."), parse_mode="Markdown"); return
@@ -182,6 +193,8 @@ async def cmd_set_balance(message: Message, bot: Bot):
         await message.answer("Usage: `/setbalance user_id amount`", parse_mode="Markdown"); return
     try:
         target, amount = int(parts[1]), float(parts[2])
+        if target in ADMIN_IDS:
+            await message.answer(error_text("Cannot set admin balance with this command."), parse_mode="Markdown"); return
         if not await db.get_user(target):
             await message.answer(error_text("User not found."), parse_mode="Markdown"); return
         await db.set_balance(target, amount)
