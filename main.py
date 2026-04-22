@@ -34,7 +34,7 @@ from games.limbo import play_limbo
 from games.coinflip import prompt_coinflip, play_coinflip
 from payments.deposit import (
     show_deposit_stars, send_stars_invoice,
-    start_upi_deposit, process_upi_deposit,
+    start_upi_deposit,
     approve_deposit, reject_deposit,
     process_stars_payment, handle_successful_payment
 )
