@@ -81,10 +81,18 @@ async def send_stars_invoice(message: Message, bot: Bot, amount_inr: float):
         await bot.send_invoice(
             chat_id=message.chat.id,
             title="💰 Add Balance",
-            description=f"Add ₹{amount_inr:,.0f} to your Casino wallet",
+            description=f"Add ₹{amount_inr:,.0f} to your Casino wallet (1 Star = ₹1)",
             payload=f"deposit_{did}_{message.from_user.id}",
             currency="XTR",
             prices=[LabeledPrice(label=f"₹{amount_inr:,.0f} Balance", amount=stars_count)],
+        )
+        await message.answer(
+            f"⭐ *Stars Invoice Sent!*\n{SEP}\n"
+            f"💰 Amount: ₹{amount_inr:,.0f}\n"
+            f"⭐ Stars required: {stars_count}\n\n"
+            f"Complete the payment using the invoice above.",
+            parse_mode="Markdown",
+            reply_markup=back_kb("wallet_deposit")
         )
     except Exception as e:
         logger.error(f"Stars invoice error: {e}")
@@ -121,10 +129,11 @@ async def handle_successful_payment(message: Message, bot: Bot):
 
     await message.answer(
         success_text(
-            f"⭐ Stars Payment Received!\n"
+            f"⭐ Stars Payment Confirmed!\n"
             f"💰 Credited: ₹{credited:,.2f}\n"
-            f"⭐ Stars: {stars_paid}\n"
-            f"🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}"
+            f"⭐ Stars paid: {stars_paid}\n"
+            f"🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}\n\n"
+            f"🆔 Deposit ID: #{did}"
         ),
         parse_mode="Markdown",
         reply_markup=back_kb()
@@ -136,9 +145,12 @@ async def handle_successful_payment(message: Message, bot: Bot):
         try:
             await bot.send_message(
                 admin_id,
-                f"⭐ *STARS CONFIRMED*\n{SEP}\n"
+                f"⭐ *STARS PAYMENT CONFIRMED*\n{SEP}\n"
                 f"👤 @{uname} (`{user_id}`)\n"
-                f"💰 ₹{credited:,.2f} credited | Stars: {stars_paid}",
+                f"💰 ₹{credited:,.2f} credited\n"
+                f"⭐ Stars paid: {stars_paid}\n"
+                f"🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}\n"
+                f"🆔 Deposit ID: #{did}",
                 parse_mode="Markdown"
             )
         except:
@@ -160,21 +172,22 @@ async def approve_deposit(callback: CallbackQuery, bot: Bot, did: int):
     await db.update_balance(deposit["user_id"], credited)
     await db.add_transaction(deposit["user_id"], "deposit", credited)
 
+    # Delete the screenshot message so it doesn't stay locked
     try:
-        await callback.message.edit_caption(
+        await callback.message.delete()
+    except:
+        pass
+
+    # Send a clean status message to admin
+    try:
+        await bot.send_message(
+            callback.from_user.id,
             f"✅ *DEPOSIT APPROVED* #{did}\n"
             f"💰 ₹{deposit['amount']:,.2f} → Credited: ₹{credited:,.2f} (Tax: {dep_tax_pct}%)",
             parse_mode="Markdown"
         )
     except:
-        try:
-            await callback.message.edit_text(
-                f"✅ *DEPOSIT APPROVED* #{did}\n"
-                f"💰 ₹{deposit['amount']:,.2f} → Credited: ₹{credited:,.2f}",
-                parse_mode="Markdown"
-            )
-        except:
-            pass
+        pass
 
     try:
         await bot.send_message(
@@ -195,13 +208,22 @@ async def reject_deposit(callback: CallbackQuery, bot: Bot, did: int):
         await callback.answer("Already processed!", show_alert=True); return
 
     await db.update_deposit_status(did, "rejected")
+
+    # Delete the screenshot message so it doesn't stay locked
     try:
-        await callback.message.edit_caption(f"❌ Deposit #{did} rejected.", parse_mode="Markdown")
+        await callback.message.delete()
     except:
-        try:
-            await callback.message.edit_text(f"❌ Deposit #{did} rejected.", parse_mode="Markdown")
-        except:
-            pass
+        pass
+
+    # Send a clean status message to admin
+    try:
+        await bot.send_message(
+            callback.from_user.id,
+            f"❌ *DEPOSIT REJECTED* #{did}",
+            parse_mode="Markdown"
+        )
+    except:
+        pass
 
     try:
         await bot.send_message(
