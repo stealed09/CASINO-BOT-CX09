@@ -318,7 +318,7 @@ async def cmd_darts(message: Message):
 async def cmd_limbo(message: Message):
     await _game_handler(message, play_limbo, "limbo")
 
-@dp.message(Command(["coinflip", "cf"]))
+@dp.message(Command("coinflip", "cf"))
 @cooldown(3)
 @registered_only
 async def cmd_cf(message: Message):
