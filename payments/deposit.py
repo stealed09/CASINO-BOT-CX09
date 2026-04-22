@@ -212,3 +212,6 @@ async def reject_deposit(callback: CallbackQuery, bot: Bot, did: int):
     except:
         pass
     await callback.answer("❌ Rejected!")
+async def process_upi_deposit(message, bot, amount):
+    # simply call existing function
+    await start_upi_deposit(message, bot, amount)
