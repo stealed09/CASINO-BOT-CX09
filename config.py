@@ -11,5 +11,5 @@ WIN_MULTIPLIER = 2.0
 TAX_PERCENT = 0.10
 DEPOSIT_TAX = 0.05
 COOLDOWN_SECONDS = 3
-DB_PATH = "/tmp/casino.db"
+DB_PATH = "/data/casino.db"
 LOG_FILE = "bot.log"
