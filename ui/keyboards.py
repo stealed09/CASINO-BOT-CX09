@@ -105,7 +105,21 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎟️ Redeem Codes", callback_data="admin_redeems"),
         InlineKeyboardButton(text="⚙️ Settings", callback_data="admin_settings")
     )
+    builder.row(
+        InlineKeyboardButton(text="💸 Tip User", callback_data="admin_tip"),
+        InlineKeyboardButton(text="💰 Manage Balance", callback_data="admin_balance")
+    )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
+    return builder.as_markup()
+
+
+def admin_balance_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="➕ Add Balance", callback_data="admin_bal_add"),
+        InlineKeyboardButton(text="➖ Remove Balance", callback_data="admin_bal_remove")
+    )
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
     return builder.as_markup()
 
 
@@ -178,4 +192,17 @@ def redeem_menu_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="🎟️ Enter Code", callback_data="redeem_enter"))
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
+    return builder.as_markup()
+
+
+def admin_redeems_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="➕ Generate New Code", callback_data="admin_gencode"))
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
+    return builder.as_markup()
+
+
+def admin_tip_kb() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
     return builder.as_markup()
