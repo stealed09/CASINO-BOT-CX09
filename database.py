@@ -79,6 +79,16 @@ class Database:
                     locked_amount REAL DEFAULT 0.0
                 )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS redeem_codes (
+                    code TEXT PRIMARY KEY,
+                    amount REAL NOT NULL,
+                    created_by INTEGER NOT NULL,
+                    used_by INTEGER DEFAULT NULL,
+                    used_at TEXT DEFAULT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
 
             defaults = [
                 ("min_withdrawal", "100"),
@@ -90,9 +100,9 @@ class Database:
                 ("upi_qr", ""),
                 ("star_payment_id", ""),
                 ("bot_username_tag", ""),
-                ("deposit_tax", "5"),        # % tax on deposits
-                ("withdrawal_tax", "0"),     # % tax on withdrawals
-                ("referral_percent", "1"),   # % of bet amount
+                ("deposit_tax", "5"),
+                ("withdrawal_tax", "0"),
+                ("referral_percent", "1"),
             ]
             for key, value in defaults:
                 await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
@@ -104,6 +114,15 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
+    async def get_user_by_username(self, username: str) -> Optional[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username.lstrip("@"),)
+            ) as cur:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
@@ -320,6 +339,45 @@ class Database:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(f"UPDATE users SET {col}=? WHERE user_id=?", (datetime.now().isoformat(), user_id))
             await db.commit()
+
+    # ─── REDEEM CODES ─────────────────────────────────────────────────────────
+
+    async def create_redeem_code(self, code: str, amount: float, admin_id: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT INTO redeem_codes (code, amount, created_by, created_at) VALUES (?, ?, ?, ?)",
+                (code.upper(), amount, admin_id, datetime.now().isoformat())
+            )
+            await db.commit()
+
+    async def get_redeem_code(self, code: str) -> Optional[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM redeem_codes WHERE code=?", (code.upper(),)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
+    async def use_redeem_code(self, code: str, user_id: int) -> bool:
+        async with self._lock:
+            async with aiosqlite.connect(self.db_path) as db:
+                async with db.execute(
+                    "SELECT * FROM redeem_codes WHERE code=? AND used_by IS NULL", (code.upper(),)
+                ) as cur:
+                    row = await cur.fetchone()
+                if not row:
+                    return False
+                await db.execute(
+                    "UPDATE redeem_codes SET used_by=?, used_at=? WHERE code=?",
+                    (user_id, datetime.now().isoformat(), code.upper())
+                )
+                await db.commit()
+                return True
+
+    async def get_all_redeem_codes(self) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM redeem_codes ORDER BY created_at DESC LIMIT 30") as cur:
+                return [dict(r) for r in await cur.fetchall()]
 
 
 db = Database()
