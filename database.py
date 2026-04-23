@@ -32,7 +32,9 @@ class Database:
                     bonus_warned INTEGER DEFAULT 0,
                     warn_time TEXT DEFAULT NULL,
                     last_weekly TEXT DEFAULT NULL,
-                    last_monthly TEXT DEFAULT NULL
+                    last_monthly TEXT DEFAULT NULL,
+                    currency_mode TEXT DEFAULT 'inr',
+                    currency_change_requested TEXT DEFAULT NULL
                 )
             """)
             await db.execute("""
@@ -41,6 +43,7 @@ class Database:
                     user_id INTEGER NOT NULL,
                     type TEXT NOT NULL,
                     amount REAL NOT NULL,
+                    currency TEXT DEFAULT 'INR',
                     status TEXT DEFAULT 'completed',
                     date TEXT NOT NULL
                 )
@@ -50,7 +53,10 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     amount REAL NOT NULL,
-                    upi_id TEXT NOT NULL,
+                    currency TEXT DEFAULT 'INR',
+                    upi_id TEXT DEFAULT '',
+                    crypto_address TEXT DEFAULT '',
+                    crypto_network TEXT DEFAULT '',
                     status TEXT DEFAULT 'pending',
                     date TEXT NOT NULL
                 )
@@ -61,9 +67,42 @@ class Database:
                     user_id INTEGER NOT NULL,
                     method TEXT NOT NULL,
                     amount REAL NOT NULL,
+                    currency TEXT DEFAULT 'INR',
                     txn_id TEXT DEFAULT '',
                     screenshot_id TEXT DEFAULT '',
                     status TEXT DEFAULT 'pending',
+                    date TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS crypto_wallets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    symbol TEXT NOT NULL,
+                    balance REAL DEFAULT 0.0,
+                    UNIQUE(user_id, symbol)
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS crypto_currencies (
+                    symbol TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    network TEXT NOT NULL,
+                    wallet_address TEXT NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    added_at TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS swap_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    from_currency TEXT NOT NULL,
+                    to_currency TEXT NOT NULL,
+                    from_amount REAL NOT NULL,
+                    to_amount REAL NOT NULL,
+                    rate REAL NOT NULL,
+                    status TEXT DEFAULT 'completed',
                     date TEXT NOT NULL
                 )
             """)
@@ -83,10 +122,21 @@ class Database:
                 CREATE TABLE IF NOT EXISTS redeem_codes (
                     code TEXT PRIMARY KEY,
                     amount REAL NOT NULL,
+                    currency TEXT DEFAULT 'INR',
                     created_by INTEGER NOT NULL,
                     used_by INTEGER DEFAULT NULL,
                     used_at TEXT DEFAULT NULL,
                     created_at TEXT NOT NULL
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS support_tickets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    message TEXT NOT NULL,
+                    admin_message_id INTEGER DEFAULT NULL,
+                    status TEXT DEFAULT 'open',
+                    date TEXT NOT NULL
                 )
             """)
 
@@ -103,12 +153,23 @@ class Database:
                 ("deposit_tax", "5"),
                 ("withdrawal_tax", "0"),
                 ("referral_percent", "1"),
+                ("crypto_to_inr_rate", "85"),
+                ("inr_to_crypto_rate", "0.012"),
+                ("swap_fee_percent", "1"),
             ]
             for key, value in defaults:
                 await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
 
+            # Default USDT TRC20
+            await db.execute("""
+                INSERT OR IGNORE INTO crypto_currencies (symbol, name, network, wallet_address, enabled, added_at)
+                VALUES ('USDT', 'Tether USD', 'TRC20', 'TYourWalletAddressHere', 1, ?)
+            """, (datetime.now().isoformat(),))
+
             await db.commit()
         logger.info("Database initialized.")
+
+    # ─── USER ──────────────────────────────────────────────────────────────────
 
     async def get_user(self, user_id: int) -> Optional[Dict]:
         async with aiosqlite.connect(self.db_path) as db:
@@ -134,8 +195,8 @@ class Database:
                         """INSERT OR IGNORE INTO users
                         (user_id, username, balance, referral_id, referral_earnings,
                          total_wagered, join_date, bonus_eligible, bonus_warned, warn_time,
-                         last_weekly, last_monthly)
-                        VALUES (?, ?, 0.0, ?, 0.0, 0.0, ?, 0, 0, NULL, NULL, NULL)""",
+                         last_weekly, last_monthly, currency_mode, currency_change_requested)
+                        VALUES (?, ?, 0.0, ?, 0.0, 0.0, ?, 0, 0, NULL, NULL, NULL, 'inr', NULL)""",
                         (user_id, username or "", referral_id, datetime.now().isoformat())
                     )
                     await db.commit()
@@ -176,11 +237,47 @@ class Database:
             await db.execute("UPDATE users SET username = ? WHERE user_id = ?", (username or "", user_id))
             await db.commit()
 
-    async def add_transaction(self, user_id: int, type_: str, amount: float, status: str = "completed"):
+    async def set_currency_mode(self, user_id: int, mode: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE users SET currency_mode = ? WHERE user_id = ?", (mode, user_id))
+            await db.commit()
+
+    async def request_currency_change(self, user_id: int, requested_mode: str):
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                "INSERT INTO transactions (user_id, type, amount, status, date) VALUES (?, ?, ?, ?, ?)",
-                (user_id, type_, amount, status, datetime.now().isoformat())
+                "UPDATE users SET currency_change_requested = ? WHERE user_id = ?",
+                (requested_mode, user_id)
+            )
+            await db.commit()
+
+    async def approve_currency_change(self, user_id: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute("SELECT currency_change_requested FROM users WHERE user_id=?", (user_id,)) as cur:
+                row = await cur.fetchone()
+            if row and row[0]:
+                await db.execute(
+                    "UPDATE users SET currency_mode=?, currency_change_requested=NULL WHERE user_id=?",
+                    (row[0], user_id)
+                )
+                await db.commit()
+                return row[0]
+            return None
+
+    async def get_pending_currency_changes(self) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM users WHERE currency_change_requested IS NOT NULL"
+            ) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+    # ─── TRANSACTIONS ──────────────────────────────────────────────────────────
+
+    async def add_transaction(self, user_id: int, type_: str, amount: float, status: str = "completed", currency: str = "INR"):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT INTO transactions (user_id, type, amount, currency, status, date) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, type_, amount, currency, status, datetime.now().isoformat())
             )
             await db.commit()
 
@@ -192,12 +289,17 @@ class Database:
             ) as cur:
                 return [dict(r) for r in await cur.fetchall()]
 
-    async def create_withdrawal(self, user_id: int, amount: float, upi_id: str) -> int:
+    # ─── WITHDRAWALS ───────────────────────────────────────────────────────────
+
+    async def create_withdrawal(self, user_id: int, amount: float, currency: str = "INR",
+                                 upi_id: str = "", crypto_address: str = "", crypto_network: str = "") -> int:
         async with self._lock:
             async with aiosqlite.connect(self.db_path) as db:
                 cur = await db.execute(
-                    "INSERT INTO withdrawals (user_id, amount, upi_id, status, date) VALUES (?, ?, ?, 'pending', ?)",
-                    (user_id, amount, upi_id, datetime.now().isoformat())
+                    """INSERT INTO withdrawals
+                    (user_id, amount, currency, upi_id, crypto_address, crypto_network, status, date)
+                    VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)""",
+                    (user_id, amount, currency, upi_id, crypto_address, crypto_network, datetime.now().isoformat())
                 )
                 await db.commit()
                 return cur.lastrowid
@@ -220,22 +322,24 @@ class Database:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
-    async def create_deposit(self, user_id: int, method: str, amount: float, txn_id: str = "", screenshot_id: str = "") -> int:
+    # ─── DEPOSITS ──────────────────────────────────────────────────────────────
+
+    async def create_deposit(self, user_id: int, method: str, amount: float,
+                              currency: str = "INR", txn_id: str = "", screenshot_id: str = "") -> int:
         async with self._lock:
             async with aiosqlite.connect(self.db_path) as db:
                 cur = await db.execute(
-                    "INSERT INTO deposits (user_id, method, amount, txn_id, screenshot_id, status, date) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
-                    (user_id, method, amount, txn_id, screenshot_id, datetime.now().isoformat())
+                    """INSERT INTO deposits
+                    (user_id, method, amount, currency, txn_id, screenshot_id, status, date)
+                    VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)""",
+                    (user_id, method, amount, currency, txn_id, screenshot_id, datetime.now().isoformat())
                 )
                 await db.commit()
                 return cur.lastrowid
 
     async def update_deposit_screenshot(self, did: int, screenshot_id: str, txn_id: str):
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "UPDATE deposits SET screenshot_id=?, txn_id=? WHERE id=?",
-                (screenshot_id, txn_id, did)
-            )
+            await db.execute("UPDATE deposits SET screenshot_id=?, txn_id=? WHERE id=?", (screenshot_id, txn_id, did))
             await db.commit()
 
     async def get_pending_deposits(self) -> List[Dict]:
@@ -256,6 +360,88 @@ class Database:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    # ─── CRYPTO WALLETS ────────────────────────────────────────────────────────
+
+    async def get_crypto_balance(self, user_id: int, symbol: str) -> float:
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT balance FROM crypto_wallets WHERE user_id=? AND symbol=?", (user_id, symbol.upper())
+            ) as cur:
+                row = await cur.fetchone()
+                return row[0] if row else 0.0
+
+    async def update_crypto_balance(self, user_id: int, symbol: str, amount: float) -> bool:
+        try:
+            async with self._lock:
+                async with aiosqlite.connect(self.db_path) as db:
+                    await db.execute(
+                        """INSERT INTO crypto_wallets (user_id, symbol, balance)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(user_id, symbol) DO UPDATE SET balance = balance + excluded.balance""",
+                        (user_id, symbol.upper(), amount)
+                    )
+                    await db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"update_crypto_balance error: {e}")
+            return False
+
+    async def get_all_crypto_balances(self, user_id: int) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM crypto_wallets WHERE user_id=?", (user_id,)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+    # ─── CRYPTO CURRENCIES ─────────────────────────────────────────────────────
+
+    async def get_all_cryptos(self, enabled_only: bool = True) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            q = "SELECT * FROM crypto_currencies WHERE enabled=1" if enabled_only else "SELECT * FROM crypto_currencies"
+            async with db.execute(q) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+    async def get_crypto(self, symbol: str) -> Optional[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM crypto_currencies WHERE symbol=?", (symbol.upper(),)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
+    async def add_crypto_currency(self, symbol: str, name: str, network: str, wallet_address: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT OR REPLACE INTO crypto_currencies (symbol, name, network, wallet_address, enabled, added_at)
+                VALUES (?, ?, ?, ?, 1, ?)""",
+                (symbol.upper(), name, network, wallet_address, datetime.now().isoformat())
+            )
+            await db.commit()
+
+    async def toggle_crypto(self, symbol: str, enabled: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE crypto_currencies SET enabled=? WHERE symbol=?", (enabled, symbol.upper()))
+            await db.commit()
+
+    async def update_crypto_address(self, symbol: str, address: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE crypto_currencies SET wallet_address=? WHERE symbol=?", (address, symbol.upper()))
+            await db.commit()
+
+    # ─── SWAP ──────────────────────────────────────────────────────────────────
+
+    async def add_swap_record(self, user_id: int, from_currency: str, to_currency: str,
+                               from_amount: float, to_amount: float, rate: float):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """INSERT INTO swap_requests
+                (user_id, from_currency, to_currency, from_amount, to_amount, rate, status, date)
+                VALUES (?, ?, ?, ?, ?, ?, 'completed', ?)""",
+                (user_id, from_currency, to_currency, from_amount, to_amount, rate, datetime.now().isoformat())
+            )
+            await db.commit()
+
+    # ─── SETTINGS ──────────────────────────────────────────────────────────────
+
     async def get_setting(self, key: str) -> Optional[str]:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -273,6 +459,8 @@ class Database:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM users") as cur:
                 return [dict(r) for r in await cur.fetchall()]
+
+    # ─── LOCKS ─────────────────────────────────────────────────────────────────
 
     async def lock_balance(self, user_id: int, amount: float) -> bool:
         try:
@@ -298,6 +486,8 @@ class Database:
             async with db.execute("SELECT user_id FROM balance_locks WHERE user_id=?", (user_id,)) as cur:
                 return await cur.fetchone() is not None
 
+    # ─── REFERRAL ──────────────────────────────────────────────────────────────
+
     async def update_referral_earnings(self, referral_id: int, amount: float):
         async with self._lock:
             async with aiosqlite.connect(self.db_path) as db:
@@ -312,6 +502,8 @@ class Database:
             async with db.execute("SELECT COUNT(*) FROM users WHERE referral_id=?", (user_id,)) as cur:
                 row = await cur.fetchone()
                 return row[0] if row else 0
+
+    # ─── BONUS ─────────────────────────────────────────────────────────────────
 
     async def set_bonus_eligible(self, user_id: int, value: int):
         async with aiosqlite.connect(self.db_path) as db:
@@ -340,13 +532,13 @@ class Database:
             await db.execute(f"UPDATE users SET {col}=? WHERE user_id=?", (datetime.now().isoformat(), user_id))
             await db.commit()
 
-    # ─── REDEEM CODES ─────────────────────────────────────────────────────────
+    # ─── REDEEM CODES ──────────────────────────────────────────────────────────
 
-    async def create_redeem_code(self, code: str, amount: float, admin_id: int):
+    async def create_redeem_code(self, code: str, amount: float, admin_id: int, currency: str = "INR"):
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
-                "INSERT INTO redeem_codes (code, amount, created_by, created_at) VALUES (?, ?, ?, ?)",
-                (code.upper(), amount, admin_id, datetime.now().isoformat())
+                "INSERT INTO redeem_codes (code, amount, currency, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
+                (code.upper(), amount, currency, admin_id, datetime.now().isoformat())
             )
             await db.commit()
 
@@ -378,6 +570,32 @@ class Database:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM redeem_codes ORDER BY created_at DESC LIMIT 30") as cur:
                 return [dict(r) for r in await cur.fetchall()]
+
+    # ─── SUPPORT TICKETS ───────────────────────────────────────────────────────
+
+    async def create_support_ticket(self, user_id: int, message: str) -> int:
+        async with aiosqlite.connect(self.db_path) as db:
+            cur = await db.execute(
+                "INSERT INTO support_tickets (user_id, message, status, date) VALUES (?, ?, 'open', ?)",
+                (user_id, message, datetime.now().isoformat())
+            )
+            await db.commit()
+            return cur.lastrowid
+
+    async def update_ticket_admin_msg(self, ticket_id: int, admin_message_id: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "UPDATE support_tickets SET admin_message_id=? WHERE id=?",
+                (admin_message_id, ticket_id)
+            )
+            await db.commit()
+
+    async def get_ticket(self, ticket_id: int) -> Optional[Dict]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM support_tickets WHERE id=?", (ticket_id,)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
 
 
 db = Database()
