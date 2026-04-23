@@ -1,12 +1,14 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from typing import List, Dict
 
 
-def main_menu_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
+def main_menu_kb(is_admin: bool = False, currency_mode: str = "inr") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    mode_icon = "₹" if currency_mode == "inr" else "₿"
     builder.row(
         InlineKeyboardButton(text="🎮 Play Games", callback_data="menu_games"),
-        InlineKeyboardButton(text="💰 Wallet", callback_data="menu_wallet")
+        InlineKeyboardButton(text=f"💰 Wallet {mode_icon}", callback_data="menu_wallet")
     )
     builder.row(
         InlineKeyboardButton(text="🎁 Bonus", callback_data="menu_bonus"),
@@ -17,7 +19,11 @@ def main_menu_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📊 History", callback_data="menu_history")
     )
     builder.row(
-        InlineKeyboardButton(text="🎟️ Redeem Code", callback_data="menu_redeem")
+        InlineKeyboardButton(text="🎟️ Redeem Code", callback_data="menu_redeem"),
+        InlineKeyboardButton(text="🔄 Swap", callback_data="menu_swap")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🔁 Switch Currency", callback_data="menu_switch_currency")
     )
     if is_admin:
         builder.row(InlineKeyboardButton(text="🔐 Admin Panel", callback_data="admin_panel"))
@@ -43,11 +49,11 @@ def games_menu_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def wallet_menu_kb() -> InlineKeyboardMarkup:
+def wallet_inr_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="💳 Deposit", callback_data="wallet_deposit"),
-        InlineKeyboardButton(text="💸 Withdraw", callback_data="wallet_withdraw")
+        InlineKeyboardButton(text="💳 Deposit INR", callback_data="wallet_deposit"),
+        InlineKeyboardButton(text="💸 Withdraw INR", callback_data="wallet_withdraw")
     )
     builder.row(
         InlineKeyboardButton(text="📋 History", callback_data="menu_history"),
@@ -56,7 +62,33 @@ def wallet_menu_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def deposit_menu_kb() -> InlineKeyboardMarkup:
+def wallet_crypto_kb(cryptos: List[Dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for c in cryptos:
+        builder.row(InlineKeyboardButton(
+            text=f"📥 Deposit {c['symbol']} ({c['network']})",
+            callback_data=f"crypto_deposit_{c['symbol']}"
+        ))
+    builder.row(InlineKeyboardButton(text="💸 Withdraw Crypto", callback_data="crypto_withdraw"))
+    builder.row(
+        InlineKeyboardButton(text="📋 History", callback_data="menu_history"),
+        InlineKeyboardButton(text="🔙 Back", callback_data="menu_main")
+    )
+    return builder.as_markup()
+
+
+def crypto_withdraw_select_kb(cryptos: List[Dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for c in cryptos:
+        builder.row(InlineKeyboardButton(
+            text=f"💸 Withdraw {c['symbol']}",
+            callback_data=f"crypto_wd_{c['symbol']}"
+        ))
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_wallet"))
+    return builder.as_markup()
+
+
+def deposit_inr_menu_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="⭐ Telegram Stars", callback_data="deposit_stars"),
@@ -106,20 +138,10 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="⚙️ Settings", callback_data="admin_settings")
     )
     builder.row(
-        InlineKeyboardButton(text="💸 Tip User", callback_data="admin_tip"),
-        InlineKeyboardButton(text="💰 Manage Balance", callback_data="admin_balance")
+        InlineKeyboardButton(text="₿ Crypto Manager", callback_data="admin_crypto"),
+        InlineKeyboardButton(text="🔁 Currency Requests", callback_data="admin_currency_requests")
     )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
-    return builder.as_markup()
-
-
-def admin_balance_kb() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="➕ Add Balance", callback_data="admin_bal_add"),
-        InlineKeyboardButton(text="➖ Remove Balance", callback_data="admin_bal_remove")
-    )
-    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
     return builder.as_markup()
 
 
@@ -149,7 +171,40 @@ def admin_settings_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📥 Deposit Tax %", callback_data="aset_deptax"),
         InlineKeyboardButton(text="📤 Withdraw Tax %", callback_data="aset_wdtax")
     )
+    builder.row(
+        InlineKeyboardButton(text="₿→₹ Rate", callback_data="aset_crypto_inr_rate"),
+        InlineKeyboardButton(text="₹→₿ Rate", callback_data="aset_inr_crypto_rate")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🔄 Swap Fee %", callback_data="aset_swap_fee")
+    )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
+    return builder.as_markup()
+
+
+def admin_crypto_kb(cryptos: List[Dict]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for c in cryptos:
+        status = "🟢" if c["enabled"] else "🔴"
+        builder.row(
+            InlineKeyboardButton(
+                text=f"{status} {c['symbol']} ({c['network']})",
+                callback_data=f"admin_crypto_detail_{c['symbol']}"
+            )
+        )
+    builder.row(InlineKeyboardButton(text="➕ Add Crypto", callback_data="admin_crypto_add"))
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
+    return builder.as_markup()
+
+
+def admin_crypto_detail_kb(symbol: str, enabled: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    toggle_text = "🔴 Disable" if enabled else "🟢 Enable"
+    builder.row(
+        InlineKeyboardButton(text=toggle_text, callback_data=f"admin_crypto_toggle_{symbol}"),
+        InlineKeyboardButton(text="✏️ Update Address", callback_data=f"admin_crypto_addr_{symbol}")
+    )
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_crypto"))
     return builder.as_markup()
 
 
@@ -167,6 +222,15 @@ def approve_reject_withdraw_kb(wid: int) -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="✅ Approve", callback_data=f"wd_approve_{wid}"),
         InlineKeyboardButton(text="❌ Reject", callback_data=f"wd_reject_{wid}")
+    )
+    return builder.as_markup()
+
+
+def approve_reject_currency_kb(user_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Approve Switch", callback_data=f"curr_approve_{user_id}"),
+        InlineKeyboardButton(text="❌ Reject Switch", callback_data=f"curr_reject_{user_id}")
     )
     return builder.as_markup()
 
@@ -195,14 +259,31 @@ def redeem_menu_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def admin_redeems_kb() -> InlineKeyboardMarkup:
+def swap_menu_kb(currency_mode: str, cryptos: List[Dict]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="➕ Generate New Code", callback_data="admin_gencode"))
-    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
+    if currency_mode == "inr":
+        for c in cryptos:
+            builder.row(InlineKeyboardButton(
+                text=f"₹ INR → {c['symbol']}",
+                callback_data=f"swap_inr_to_{c['symbol']}"
+            ))
+    else:
+        builder.row(InlineKeyboardButton(text="₿ Crypto → ₹ INR", callback_data="swap_crypto_to_inr"))
+        for c in cryptos:
+            for c2 in cryptos:
+                if c["symbol"] != c2["symbol"]:
+                    builder.row(InlineKeyboardButton(
+                        text=f"{c['symbol']} → {c2['symbol']}",
+                        callback_data=f"swap_{c['symbol']}_to_{c2['symbol']}"
+                    ))
+    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
     return builder.as_markup()
 
 
-def admin_tip_kb() -> InlineKeyboardMarkup:
+def support_reply_kb(ticket_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
+    builder.row(InlineKeyboardButton(
+        text="↩️ Reply to User",
+        callback_data=f"support_reply_{ticket_id}"
+    ))
     return builder.as_markup()
