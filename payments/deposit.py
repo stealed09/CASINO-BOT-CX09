@@ -5,12 +5,11 @@ from aiogram import Bot
 from database import db
 from config import ADMIN_IDS
 from ui.keyboards import approve_reject_deposit_kb, back_kb, upi_paid_done_kb
-from ui.messages import success_text, error_text, SEP
+from ui.messages import success_text, error_text, SEP, crypto_deposit_text
 from utils.logger import logger
 
 
 async def generate_upi_qr(upi_id: str, amount: float) -> BufferedInputFile:
-    """Generate a UPI QR code for a specific amount."""
     upi_string = f"upi://pay?pa={upi_id}&am={amount:.2f}&cu=INR"
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(upi_string)
@@ -23,13 +22,8 @@ async def generate_upi_qr(upi_id: str, amount: float) -> BufferedInputFile:
 
 
 async def start_upi_deposit(message: Message, bot: Bot, amount: float):
-    """Step 1: Generate QR for the amount and show Payment Done button."""
     upi_id = await db.get_setting("upi_id") or "notset@upi"
-
-    # Create a pending deposit record first
-    did = await db.create_deposit(message.from_user.id, "upi", amount)
-
-    # Generate QR
+    did = await db.create_deposit(message.from_user.id, "upi", amount, "INR")
     try:
         qr_file = await generate_upi_qr(upi_id, amount)
         await message.answer_photo(
@@ -40,8 +34,7 @@ async def start_upi_deposit(message: Message, bot: Bot, amount: float):
                 f"🏦 UPI ID: `{upi_id}`\n\n"
                 f"📌 Scan QR or pay to UPI ID above\n"
                 f"After payment click ✅ *Payment Done*\n"
-                f"{SEP}\n"
-                f"🆔 Request ID: *#{did}*"
+                f"{SEP}\n🆔 Request ID: *#{did}*"
             ),
             parse_mode="Markdown",
             reply_markup=upi_paid_done_kb(did)
@@ -52,11 +45,25 @@ async def start_upi_deposit(message: Message, bot: Bot, amount: float):
             f"🏦 *UPI PAYMENT*\n{SEP}\n"
             f"💰 Amount: *₹{amount:,.2f}*\n"
             f"🏦 UPI ID: `{upi_id}`\n\n"
-            f"Pay the above amount and click ✅ Done\n"
-            f"🆔 Request ID: *#{did}*",
+            f"Pay and click ✅ Done\n🆔 Request ID: *#{did}*",
             parse_mode="Markdown",
             reply_markup=upi_paid_done_kb(did)
         )
+
+
+async def start_crypto_deposit(message: Message, bot: Bot, symbol: str, amount: float):
+    crypto = await db.get_crypto(symbol)
+    if not crypto:
+        await message.answer(error_text("Crypto not found."), parse_mode="Markdown"); return
+
+    did = await db.create_deposit(message.from_user.id, "crypto", amount, symbol)
+    text = crypto_deposit_text(symbol, crypto["network"], crypto["wallet_address"], amount)
+
+    await message.answer(
+        text,
+        parse_mode="Markdown",
+        reply_markup=upi_paid_done_kb(did)
+    )
 
 
 async def show_deposit_stars(callback: CallbackQuery):
@@ -69,30 +76,20 @@ async def show_deposit_stars(callback: CallbackQuery):
             reply_markup=back_kb("wallet_deposit")
         )
     except:
-        await callback.message.answer(
-            "Send amount in ₹:", reply_markup=back_kb("wallet_deposit")
-        )
+        await callback.message.answer("Send amount in ₹:", reply_markup=back_kb("wallet_deposit"))
 
 
 async def send_stars_invoice(message: Message, bot: Bot, amount_inr: float):
     stars_count = max(1, int(amount_inr))
-    did = await db.create_deposit(message.from_user.id, "stars", amount_inr)
+    did = await db.create_deposit(message.from_user.id, "stars", amount_inr, "INR")
     try:
         await bot.send_invoice(
             chat_id=message.chat.id,
             title="💰 Add Balance",
-            description=f"Add ₹{amount_inr:,.0f} to your Casino wallet (1 Star = ₹1)",
+            description=f"Add ₹{amount_inr:,.0f} to your Casino wallet",
             payload=f"deposit_{did}_{message.from_user.id}",
             currency="XTR",
             prices=[LabeledPrice(label=f"₹{amount_inr:,.0f} Balance", amount=stars_count)],
-        )
-        await message.answer(
-            f"⭐ *Stars Invoice Sent!*\n{SEP}\n"
-            f"💰 Amount: ₹{amount_inr:,.0f}\n"
-            f"⭐ Stars required: {stars_count}\n\n"
-            f"Complete the payment using the invoice above.",
-            parse_mode="Markdown",
-            reply_markup=back_kb("wallet_deposit")
         )
     except Exception as e:
         logger.error(f"Stars invoice error: {e}")
@@ -125,18 +122,16 @@ async def handle_successful_payment(message: Message, bot: Bot):
 
     await db.update_deposit_status(did, "approved")
     await db.update_balance(user_id, credited)
-    await db.add_transaction(user_id, "deposit", credited)
+    await db.add_transaction(user_id, "deposit", credited, currency="INR")
 
     await message.answer(
         success_text(
-            f"⭐ Stars Payment Confirmed!\n"
+            f"⭐ Stars Payment Received!\n"
             f"💰 Credited: ₹{credited:,.2f}\n"
-            f"⭐ Stars paid: {stars_paid}\n"
-            f"🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}\n\n"
-            f"🆔 Deposit ID: #{did}"
+            f"⭐ Stars: {stars_paid}\n"
+            f"🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}"
         ),
-        parse_mode="Markdown",
-        reply_markup=back_kb()
+        parse_mode="Markdown", reply_markup=back_kb()
     )
 
     user = await db.get_user(user_id)
@@ -145,12 +140,9 @@ async def handle_successful_payment(message: Message, bot: Bot):
         try:
             await bot.send_message(
                 admin_id,
-                f"⭐ *STARS PAYMENT CONFIRMED*\n{SEP}\n"
+                f"⭐ *STARS CONFIRMED*\n{SEP}\n"
                 f"👤 @{uname} (`{user_id}`)\n"
-                f"💰 ₹{credited:,.2f} credited\n"
-                f"⭐ Stars paid: {stars_paid}\n"
-                f"🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}\n"
-                f"🆔 Deposit ID: #{did}",
+                f"💰 ₹{credited:,.2f} credited | Stars: {stars_paid}",
                 parse_mode="Markdown"
             )
         except:
@@ -164,35 +156,44 @@ async def approve_deposit(callback: CallbackQuery, bot: Bot, did: int):
     if deposit["status"] != "pending":
         await callback.answer("Already processed!", show_alert=True); return
 
+    currency = deposit.get("currency", "INR")
     dep_tax_pct = float(await db.get_setting("deposit_tax") or "5")
-    tax = round(deposit["amount"] * dep_tax_pct / 100, 2)
-    credited = round(deposit["amount"] - tax, 2)
+    tax = round(deposit["amount"] * dep_tax_pct / 100, 6)
+    credited = round(deposit["amount"] - tax, 6)
+    sym = "₹" if currency == "INR" else currency
 
     await db.update_deposit_status(did, "approved")
-    await db.update_balance(deposit["user_id"], credited)
-    await db.add_transaction(deposit["user_id"], "deposit", credited)
 
-    # Delete the screenshot message so it doesn't stay locked
-    try:
-        await callback.message.delete()
-    except:
-        pass
+    if currency == "INR":
+        await db.update_balance(deposit["user_id"], credited)
+        await db.add_transaction(deposit["user_id"], "deposit", credited, currency="INR")
+    else:
+        await db.update_crypto_balance(deposit["user_id"], currency, credited)
+        await db.add_transaction(deposit["user_id"], "crypto_deposit", credited, currency=currency)
 
-    # Send a clean status message to admin
     try:
-        await bot.send_message(
-            callback.from_user.id,
+        await callback.message.edit_caption(
             f"✅ *DEPOSIT APPROVED* #{did}\n"
-            f"💰 ₹{deposit['amount']:,.2f} → Credited: ₹{credited:,.2f} (Tax: {dep_tax_pct}%)",
+            f"{sym}{deposit['amount']:,.6f} → Credited: {sym}{credited:,.6f} (Tax: {dep_tax_pct}%)",
             parse_mode="Markdown"
         )
     except:
-        pass
+        try:
+            await callback.message.edit_text(
+                f"✅ *DEPOSIT APPROVED* #{did}\nCredited: {sym}{credited:,.6f}",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
 
     try:
         await bot.send_message(
             deposit["user_id"],
-            success_text(f"Deposit approved!\n💰 Credited: ₹{credited:,.2f}\n🧾 Tax ({dep_tax_pct}%): -₹{tax:,.2f}"),
+            success_text(
+                f"Deposit approved!\n"
+                f"💰 Credited: {sym}{credited:,.6f}\n"
+                f"🧾 Tax ({dep_tax_pct}%): -{sym}{tax:,.6f}"
+            ),
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -208,23 +209,13 @@ async def reject_deposit(callback: CallbackQuery, bot: Bot, did: int):
         await callback.answer("Already processed!", show_alert=True); return
 
     await db.update_deposit_status(did, "rejected")
-
-    # Delete the screenshot message so it doesn't stay locked
     try:
-        await callback.message.delete()
+        await callback.message.edit_caption(f"❌ Deposit #{did} rejected.")
     except:
-        pass
-
-    # Send a clean status message to admin
-    try:
-        await bot.send_message(
-            callback.from_user.id,
-            f"❌ *DEPOSIT REJECTED* #{did}",
-            parse_mode="Markdown"
-        )
-    except:
-        pass
-
+        try:
+            await callback.message.edit_text(f"❌ Deposit #{did} rejected.")
+        except:
+            pass
     try:
         await bot.send_message(
             deposit["user_id"],
