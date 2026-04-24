@@ -249,8 +249,8 @@ async def create_oxapay_deposit(message: Message, bot: Bot,
     track_id    = str(result.get("trackId", ""))
     expire_mins = result.get("lifeTime", 60)
 
-    # Save track_id for polling
-    await db.update_deposit_txn(did, track_id)
+    # Save track_id using existing method (screenshot_id="", txn_id=track_id)
+    await db.update_deposit_screenshot(did, "", track_id)
 
     await message.answer(
         f"₿ <b>CRYPTO DEPOSIT</b>\n{SEP}\n"
@@ -263,6 +263,7 @@ async def create_oxapay_deposit(message: Message, bot: Bot,
         f"🧾 Tax ({dep_tax_pct}%): <b>-{tax_tokens:,.4f}</b>\n"
         f"✅ You Receive: <b>{net_tokens:,.4f} Tokens</b>\n"
         f"{SEP}\n"
+        f"⚡ Powered by <b>Oxapay</b>\n"
         f"⏳ Auto-confirms in ~5 min\n"
         f"⚠️ Send EXACT amount, correct network!\n"
         f"🕐 Expires in <b>{expire_mins} min</b>\n"
