@@ -12,7 +12,7 @@ from ui.keyboards import (
 from ui.messages import success_text, error_text, SEP
 from utils.logger import logger
 from payments.oxapay import (
-    create_invoice, check_payment, OXAPAY_CURRENCIES,
+    create_invoice, check_payment,
     PAID_STATUSES, FAILED_STATUSES
 )
 
