@@ -229,7 +229,14 @@ async def create_nowpayments_deposit(message: Message, bot: Bot,
 
     if not result:
         await message.answer(
-            error_text("Failed to create payment. Try again or contact support."),
+            error_text(
+                "Failed to create payment.\n\n"
+                "Possible reasons:\n"
+                "• Invalid NowPayments API key in .env\n"
+                "• Selected crypto not supported\n"
+                "• NowPayments service issue\n\n"
+                "Contact support or try a different crypto."
+            ),
             parse_mode="HTML"
         )
         return
@@ -457,3 +464,4 @@ async def reject_deposit(callback: CallbackQuery, bot: Bot, did: int):
     except:
         pass
     await callback.answer("❌ Rejected!")
+                          
