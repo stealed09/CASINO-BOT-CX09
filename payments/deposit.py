@@ -317,7 +317,7 @@ async def poll_nowpayments_status(bot: Bot, payment_id: str):
                 base = deposit.get("inr_amount") or deposit.get("crypto_amount") or 0
                 rate_key = f"crypto_to_token_rate_{order['pay_currency'].upper()}"
                 rate = float(await db.get_setting(rate_key) or "85")
-                gross = round(base <b> rate, 4) if base else round(order["pay_amount"] </b> rate, 4)
+                gross = round(base * rate, 4) if base else round(order["pay_amount"] * rate, 4)
                 tax = round(gross * dep_tax_pct / 100, 4)
                 token_amount = round(gross - tax, 4)
 
