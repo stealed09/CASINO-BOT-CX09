@@ -85,23 +85,24 @@ def withdraw_method_kb(cryptos: List[Dict]) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def nowpayments_currency_kb(token_amount: float) -> InlineKeyboardMarkup:
-    """Choose crypto for NowPayments auto-deposit."""
+def oxapay_currency_kb(token_amount: float) -> InlineKeyboardMarkup:
+    """Choose crypto for Oxapay auto-deposit."""
     builder = InlineKeyboardBuilder()
     currencies = [
-        ("USDT (TRC20)", "usdttrc20"),
-        ("USDT (ERC20)", "usdterc20"),
-        ("Bitcoin", "btc"),
-        ("Ethereum", "eth"),
-        ("Litecoin", "ltc"),
-        ("TRON", "trx"),
-        ("Dogecoin", "doge"),
-        ("BNB", "bnb"),
+        ("USDT (TRC20)", "USDT", "TRC20"),
+        ("USDT (ERC20)", "USDT", "ERC20"),
+        ("USDT (BEP20)", "USDT", "BEP20"),
+        ("Bitcoin",      "BTC",  "BTC"),
+        ("Ethereum",     "ETH",  "ERC20"),
+        ("Litecoin",     "LTC",  "LTC"),
+        ("TRON",         "TRX",  "TRC20"),
+        ("Dogecoin",     "DOGE", "DOGE"),
+        ("BNB",          "BNB",  "BEP20"),
     ]
-    for name, code in currencies:
+    for label, currency, network in currencies:
         builder.row(InlineKeyboardButton(
-            text=f"₿ {name}",
-            callback_data=f"np_pay_{code}_{token_amount}"
+            text=f"₿ {label}",
+            callback_data=f"oxapay_{currency}_{network}_{int(token_amount)}"
         ))
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="wallet_deposit"))
     return builder.as_markup()
@@ -185,6 +186,7 @@ def admin_settings_kb() -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text="⭐ Stars→Token Rate", callback_data="aset_stars_token_rate"),
+        InlineKeyboardButton(text="💲 USD→Token Rate", callback_data="aset_usd_token_rate"),
     )
     builder.row(
         InlineKeyboardButton(text="₿ USDT→Token Rate", callback_data="aset_crypto_rate_USDT"),
@@ -199,6 +201,7 @@ def admin_settings_kb() -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text="⚡ Toggle Auto Crypto", callback_data="aset_nowpay_toggle"),
+        InlineKeyboardButton(text="🔑 Oxapay Key", callback_data="aset_oxapay_key"),
     )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
     return builder.as_markup()
@@ -324,3 +327,4 @@ def support_reply_kb(ticket_id: int) -> InlineKeyboardMarkup:
         callback_data=f"support_reply_{ticket_id}"
     ))
     return builder.as_markup()
+    
