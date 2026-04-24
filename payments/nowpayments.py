@@ -1,6 +1,5 @@
 """
-NowPayments.io SANDBOX integration.
-Switch to live: set SANDBOX = False and fill _LIVE_KEY
+NowPayments.io LIVE integration.
 """
 import aiohttp
 import hashlib
@@ -8,18 +7,16 @@ import hmac
 from typing import Optional, Dict
 from utils.logger import logger
 
-# ── CONFIG ─────────────────────────────────────────────────────────────────────
-SANDBOX      = True
-_SANDBOX_KEY = "VWZATYB-M2TM9YM-NBM00FA-N10NK8Z"
-_LIVE_KEY    = ""   # paste live key here when going live
-_SANDBOX_URL = "https://api-sandbox.nowpayments.io/v1"
+# ── LIVE CONFIG ────────────────────────────────────────────────────────────────
+SANDBOX      = False
+_LIVE_KEY    = "VWZATYB-M2TM9YM-NBM00FA-N10NK8Z"
 _LIVE_URL    = "https://api.nowpayments.io/v1"
 
 def _api_key() -> str:
-    return _SANDBOX_KEY if SANDBOX else _LIVE_KEY
+    return _LIVE_KEY
 
 def _base_url() -> str:
-    return _SANDBOX_URL if SANDBOX else _LIVE_URL
+    return _LIVE_URL
 
 def _headers() -> dict:
     return {"x-api-key": _api_key(), "Content-Type": "application/json"}
