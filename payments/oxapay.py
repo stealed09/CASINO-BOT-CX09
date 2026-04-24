@@ -8,7 +8,7 @@ from utils.logger import logger
 
 # ── CONFIG — Admin sets MERCHANT_KEY via /aset_oxapay_key ─────────────────────
 _BASE_URL    = "https://api.oxapay.com"
-_MERCHANT_KEY = ""   # set via admin panel or hardcode here
+_MERCHANT_KEY = "ZVPRPD-BQAIMR-HTQE1F-CG1HUY"  # live key
 
 def _get_key() -> str:
     return _MERCHANT_KEY
