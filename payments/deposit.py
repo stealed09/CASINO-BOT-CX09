@@ -233,30 +233,27 @@ async def create_oxapay_deposit(message: Message, bot: Bot,
 
     if not result:
         await message.answer(
-            error_text(
-                "Failed to create payment.\n\n"
-                "Possible reasons:\n"
-                "• Invalid Oxapay merchant key\n"
-                "• Check Admin → Settings → Oxapay Key\n\n"
-                "Contact admin if issue persists."
-            ),
+            error_text("Failed to create payment.\nTry again or contact support."),
             parse_mode="HTML"
         )
         return
 
-    pay_address = result.get("address", "")
-    pay_amount  = result.get("amount", usd_amount)
-    track_id    = str(result.get("trackId", ""))
-    expire_mins = result.get("lifeTime", 60)
+    # Handle both new and legacy API response field names
+    pay_address = (result.get("pay_address") or result.get("payAddress") or
+                   result.get("address") or "")
+    pay_amount  = (result.get("pay_amount") or result.get("payAmount") or
+                   result.get("amount") or usd_amount)
+    track_id    = str(result.get("track_id") or result.get("trackId") or "")
+    pay_link    = result.get("pay_link") or result.get("payLink") or ""
 
-    # Save track_id using existing method (screenshot_id="", txn_id=track_id)
+    # Save track_id for polling
     await db.update_deposit_screenshot(did, "", track_id)
 
-    await message.answer(
+    msg_text = (
         f"₿ <b>CRYPTO DEPOSIT</b>\n{SEP}\n"
         f"🪙 Currency: <b>{currency} ({network})</b>\n"
         f"💰 Send Exactly: <b>{pay_amount} {currency}</b>\n"
-        f"📬 To Address:\n<code>{pay_address}</code>\n"
+        f"📬 Address:\n<code>{pay_address if pay_address else 'See payment link below'}</code>\n"
         f"{SEP}\n"
         f"📊 Rate: $1 = <b>{rate} Tokens</b>\n"
         f"🪙 Gross: <b>{gross_tokens:,.0f}</b> Tokens\n"
@@ -266,11 +263,30 @@ async def create_oxapay_deposit(message: Message, bot: Bot,
         f"⚡ Powered by <b>Oxapay</b>\n"
         f"⏳ Auto-confirms in ~5 min\n"
         f"⚠️ Send EXACT amount, correct network!\n"
-        f"🕐 Expires in <b>{expire_mins} min</b>\n"
-        f"🆔 Order: <b>#{did}</b>",
-        parse_mode="HTML",
-        reply_markup=back_kb()
+        f"🕐 Expires in <b>60 min</b>\n"
+        f"🆔 Order: <b>#{did}</b>"
     )
+    if pay_link:
+        msg_text += f"\n🔗 <a href='{pay_link}'>Open Payment Page</a>"
+
+    # Send with QR code if address available
+    if pay_address:
+        try:
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(pay_address)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+            qr_file = BufferedInputFile(buf.read(), filename="crypto_qr.png")
+            await message.answer_photo(photo=qr_file, caption=msg_text,
+                                        parse_mode="HTML", reply_markup=back_kb())
+        except Exception as e:
+            logger.error(f"QR error: {e}")
+            await message.answer(msg_text, parse_mode="HTML", reply_markup=back_kb())
+    else:
+        await message.answer(msg_text, parse_mode="HTML", reply_markup=back_kb())
 
     user = await db.get_user(user_id)
     uname = user.get("username", str(user_id)) if user else str(user_id)
