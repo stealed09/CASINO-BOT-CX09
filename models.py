@@ -44,3 +44,4 @@ class Deposit:
     txn_id: str
     status: str
     date: str
+    
