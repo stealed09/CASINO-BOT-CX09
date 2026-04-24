@@ -13,7 +13,7 @@ from ui.messages import success_text, error_text, SEP
 from utils.logger import logger
 from payments.oxapay import (
     create_invoice, check_payment, OXAPAY_CURRENCIES,
-    PAID_STATUSES, FAILED_STATUSES, set_merchant_key
+    PAID_STATUSES, FAILED_STATUSES
 )
 
 
@@ -208,17 +208,6 @@ async def start_oxapay_deposit(callback: CallbackQuery, token_amount: float):
 async def create_oxapay_deposit(message: Message, bot: Bot,
                                   user_id: int, currency: str, network: str, token_amount: float):
     """Create Oxapay invoice and send payment instructions."""
-    # Load merchant key from DB each time (admin can update it)
-    merchant_key = await db.get_setting("oxapay_merchant_key") or ""
-    if not merchant_key:
-        await message.answer(
-            error_text("Crypto payment not configured.\nContact admin."),
-            parse_mode="HTML"
-        )
-        return
-
-    set_merchant_key(merchant_key)
-
     rate = await get_usd_token_rate()
     dep_tax_pct = await db.get_effective_deposit_tax(user_id)
     usd_amount = max(round(token_amount / rate, 2), 1.0)  # min $1
@@ -446,4 +435,4 @@ async def reject_deposit(callback: CallbackQuery, bot: Bot, did: int):
     except:
         pass
     await callback.answer("❌ Rejected!")
-                                      
+    
