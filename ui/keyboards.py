@@ -151,27 +151,12 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🏆 Wager Board", callback_data="admin_wager"),
         InlineKeyboardButton(text="👤 User Lookup", callback_data="admin_user_lookup")
     )
-    builder.row(
-        InlineKeyboardButton(text="₿ Crypto Manager", callback_data="admin_crypto")
-    )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="menu_main"))
     return builder.as_markup()
 
 
 def admin_settings_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="💸 Min Withdraw (T)", callback_data="aset_minwd"),
-        InlineKeyboardButton(text="🔄 Toggle Withdraw", callback_data="aset_wdtoggle")
-    )
-    builder.row(
-        InlineKeyboardButton(text="🎁 Weekly Bonus (T)", callback_data="aset_weekly"),
-        InlineKeyboardButton(text="📅 Monthly Bonus (T)", callback_data="aset_monthly")
-    )
-    builder.row(
-        InlineKeyboardButton(text="🎰 Bonus Mode", callback_data="aset_bonusmode"),
-        InlineKeyboardButton(text="🏷️ Bot Tag", callback_data="aset_bottag")
-    )
     builder.row(
         InlineKeyboardButton(text="🏦 UPI ID", callback_data="aset_upi"),
         InlineKeyboardButton(text="📸 UPI QR", callback_data="aset_qr")
@@ -181,27 +166,27 @@ def admin_settings_kb() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📤 Withdraw Tax %", callback_data="aset_wdtax")
     )
     builder.row(
-        InlineKeyboardButton(text="🤝 Referral %", callback_data="aset_referral"),
-        InlineKeyboardButton(text="💱 INR→Token Rate", callback_data="aset_inr_token_rate")
+        InlineKeyboardButton(text="💲 USD→Token Rate", callback_data="aset_usd_token_rate"),
+        InlineKeyboardButton(text="💱 INR→Token Rate", callback_data="aset_inr_token_rate"),
     )
     builder.row(
         InlineKeyboardButton(text="⭐ Stars→Token Rate", callback_data="aset_stars_token_rate"),
-        InlineKeyboardButton(text="💲 USD→Token Rate", callback_data="aset_usd_token_rate"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="₿ USDT→Token Rate", callback_data="aset_crypto_rate_USDT"),
-        InlineKeyboardButton(text="₿ BTC→Token Rate", callback_data="aset_crypto_rate_BTC"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="₿ ETH→Token Rate", callback_data="aset_crypto_rate_ETH"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="🎯 Weekly Wager %", callback_data="aset_wager_pct_weekly"),
-        InlineKeyboardButton(text="🎯 Monthly Wager %", callback_data="aset_wager_pct_monthly"),
-    )
-    builder.row(
-        InlineKeyboardButton(text="⚡ Toggle Auto Crypto", callback_data="aset_nowpay_toggle"),
         InlineKeyboardButton(text="🔑 Oxapay Key", callback_data="aset_oxapay_key"),
+    )
+    builder.row(
+        InlineKeyboardButton(text="🎁 Weekly Bonus", callback_data="aset_weekly"),
+        InlineKeyboardButton(text="📅 Monthly Bonus", callback_data="aset_monthly")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🎰 Bonus Mode", callback_data="aset_bonusmode"),
+        InlineKeyboardButton(text="🏷️ Bot Tag", callback_data="aset_bottag")
+    )
+    builder.row(
+        InlineKeyboardButton(text="💸 Min Withdraw", callback_data="aset_minwd"),
+        InlineKeyboardButton(text="🔄 Toggle Withdraw", callback_data="aset_wdtoggle")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🤝 Referral %", callback_data="aset_referral"),
     )
     builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="admin_panel"))
     return builder.as_markup()
