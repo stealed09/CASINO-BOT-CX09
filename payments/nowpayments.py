@@ -8,18 +8,11 @@ from typing import Optional, Dict
 from utils.logger import logger
 
 # ── LIVE CONFIG ────────────────────────────────────────────────────────────────
-SANDBOX      = False
-_LIVE_KEY    = "VWZATYB-M2TM9YM-NBM00FA-N10NK8Z"
-_LIVE_URL    = "https://api.nowpayments.io/v1"
-
-def _api_key() -> str:
-    return _LIVE_KEY
-
-def _base_url() -> str:
-    return _LIVE_URL
+_LIVE_KEY = "VWZATYB-M2TM9YM-NBM00FA-N10NK8Z"
+_LIVE_URL = "https://api.nowpayments.io/v1"
 
 def _headers() -> dict:
-    return {"x-api-key": _api_key(), "Content-Type": "application/json"}
+    return {"x-api-key": _LIVE_KEY, "Content-Type": "application/json"}
 
 
 # ── API CALLS ──────────────────────────────────────────────────────────────────
@@ -32,14 +25,14 @@ async def create_payment(pay_currency: str, price_amount: float,
         "pay_currency": pay_currency.lower(),
         "order_id": order_id,
         "order_description": order_description,
-        "ipn_callback_url": "",
+        # ipn_callback_url removed — not required, live rejects empty string
         "is_fixed_rate": False,
         "is_fee_paid_by_user": False,
     }
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{_base_url()}/payment",
+                f"{_LIVE_URL}/payment",
                 headers=_headers(),
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=20)
@@ -59,7 +52,7 @@ async def get_payment_status(payment_id: str) -> Optional[Dict]:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{_base_url()}/payment/{payment_id}",
+                f"{_LIVE_URL}/payment/{payment_id}",
                 headers=_headers(),
                 timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
@@ -75,7 +68,7 @@ async def get_available_currencies() -> list:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{_base_url()}/currencies",
+                f"{_LIVE_URL}/currencies",
                 headers=_headers(),
                 timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
@@ -92,7 +85,7 @@ async def get_estimated_price(amount: float, currency_from: str, currency_to: st
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{_base_url()}/estimate",
+                f"{_LIVE_URL}/estimate",
                 headers=_headers(),
                 params={"amount": amount, "currency_from": "usd", "currency_to": currency_to.lower()},
                 timeout=aiohttp.ClientTimeout(total=10)
@@ -107,13 +100,7 @@ async def get_estimated_price(amount: float, currency_from: str, currency_to: st
 
 
 def verify_ipn_signature(request_body: bytes, received_sig: str) -> bool:
-    ipn_secret = ""  # set if using webhook
-    if not ipn_secret:
-        return True
-    expected = hmac.new(
-        ipn_secret.encode(), request_body, hashlib.sha512
-    ).hexdigest()
-    return hmac.compare_digest(expected, received_sig)
+    return True  # no webhook configured
 
 
 FINISHED_STATUSES = {"finished", "confirmed"}
