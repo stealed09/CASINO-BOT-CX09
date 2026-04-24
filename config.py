@@ -11,6 +11,8 @@ NOWPAYMENTS_API_KEY = os.getenv("NOWPAYMENTS_API_KEY", "")
 NOWPAYMENTS_IPN_SECRET = os.getenv("NOWPAYMENTS_IPN_SECRET", "")
 NOWPAYMENTS_API_URL = "https://api.nowpayments.io/v1"
 
+# Keep for backwards compatibility with utils/helpers.py
+REFERRAL_PERCENT = 0.01
 WIN_MULTIPLIER = 2.0
 TAX_PERCENT = 0.10
 COOLDOWN_SECONDS = 3
