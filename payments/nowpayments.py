@@ -12,10 +12,11 @@ from utils.logger import logger
 
 
 def _headers() -> dict:
-    """Build headers dynamically so API key is always current."""
-    from config import NOWPAYMENTS_API_KEY as KEY
+    """Build headers dynamically — reads API key fresh from env every call."""
+    import os
+    key = os.environ.get("NOWPAYMENTS_API_KEY", "")
     return {
-        "x-api-key": KEY,
+        "x-api-key": key,
         "Content-Type": "application/json",
     }
 
