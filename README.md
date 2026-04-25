@@ -16,10 +16,7 @@ In Railway dashboard → Variables tab, add:
 ```
 BOT_TOKEN=your_bot_token
 ADMIN_IDS=123456789
-STAR_PAYMENT_ID=your_star_id
-UPI_ID=yourname@upi
-DEFAULT_MIN_WITHDRAWAL=100
-REFERRAL_PERCENT=0.01
+DB PATH 
 ```
 
 ### Step 4: Add Persistent Volume (CRITICAL for data persistence)
@@ -147,3 +144,7 @@ tail -f /opt/casinobot/bot.log
 | `/deposit` | Deposit menu |
 | `/withdraw amount upi_id` | Withdraw funds |
 | `/support` | Contact support |
+
+
+CREDIT TELEGRAM USER
+"@TALK_WITH_STEALED"
