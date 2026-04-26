@@ -3334,16 +3334,18 @@ async def cb_admin_new_features(callback: CallbackQuery):
 
 
 # Toggle handlers for new feature settings
+import traceback
+
 async def main():
-    logger.info("🚀 Bot starting...")
-
-    print("DB PATH:", db.db_path)   # ← yaha add karo
-    await db.init()                # ← yaha add karo
-    print("DB INIT DONE")          # ← yaha add karo
-
     try:
-        await bot.delete_webhook(drop_pending_updates=True)
-    except:
-        pass
+        logger.info("🚀 Bot starting...")
 
-    await dp.start_polling(bot)
+        await db.init()
+
+        await bot.delete_webhook(drop_pending_updates=True)
+
+        await dp.start_polling(bot)
+
+    except Exception as e:
+        print("FATAL ERROR:", e)
+        traceback.print_exc()
