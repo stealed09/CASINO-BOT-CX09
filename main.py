@@ -3334,3 +3334,17 @@ async def cb_admin_new_features(callback: CallbackQuery):
 
 
 # Toggle handlers for new feature settings
+async def main():
+    logger.info("🚀 Bot starting...")
+
+    # (optional but recommended)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+    except:
+        pass
+
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
