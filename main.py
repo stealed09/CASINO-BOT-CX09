@@ -3337,9 +3337,10 @@ async def cb_admin_new_features(callback: CallbackQuery):
 async def main():
     logger.info("🚀 Bot starting...")
 
-    await db.init()   # ⭐ YE LINE ADD KARO (YAHI)
+    print("DB PATH:", db.db_path)   # ← yaha add karo
+    await db.init()                # ← yaha add karo
+    print("DB INIT DONE")          # ← yaha add karo
 
-    # (optional but recommended)
     try:
         await bot.delete_webhook(drop_pending_updates=True)
     except:
