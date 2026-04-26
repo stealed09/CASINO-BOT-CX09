@@ -382,7 +382,7 @@ async def cmd_start(message: Message, state: FSMContext):
     is_admin = user_id in ADMIN_IDS
     text = main_menu_text(username or str(user_id), user["token_balance"])
     await message.answer(text, parse_mode="HTML", reply_markup=main_menu_kb(is_admin))
-
+    
 
 # ─── MAIN MENU NAVIGATION ─────────────────────────────────────────────────────
 
