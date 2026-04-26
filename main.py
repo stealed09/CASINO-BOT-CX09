@@ -3337,6 +3337,8 @@ async def cb_admin_new_features(callback: CallbackQuery):
 async def main():
     logger.info("🚀 Bot starting...")
 
+    await db.init()   # ⭐ YE LINE ADD KARO (YAHI)
+
     # (optional but recommended)
     try:
         await bot.delete_webhook(drop_pending_updates=True)
@@ -3344,7 +3346,3 @@ async def main():
         pass
 
     await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
