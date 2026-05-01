@@ -1,0 +1,27 @@
+# Telegram bot framework (used by main.py)
+aiogram==3.7.0
+
+# HTTP server for health check endpoint
+aiohttp==3.9.5
+
+# Async SQLite database
+aiosqlite==0.20.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Logging
+loguru==0.7.2
+
+# QR code generation (used by bot.py escrow system)
+qrcode[pil]==7.4.2
+Pillow==10.1.0
+
+# Escrow bot framework (used by bot.py only)
+python-telegram-bot==20.3
+
+# Telethon for auto group creation (used by bot.py)
+telethon==1.36.0
+
+# Payments
+httpx==0.27.0
