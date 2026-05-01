@@ -23,5 +23,5 @@ python-telegram-bot==20.3
 # Telethon for auto group creation (used by bot.py)
 telethon==1.36.0
 
-# Payments
-httpx==0.27.0
+# Payments — pinned to 0.24.1 for python-telegram-bot==20.3 compatibility
+httpx==0.24.1
